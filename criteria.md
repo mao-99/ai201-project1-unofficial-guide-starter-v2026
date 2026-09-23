@@ -23,8 +23,10 @@ For at least 4 of my 5 test questions, the retrieved chunks include one that
 contains the answer.
 
 **Why this target:**
-<!-- e.g. "One of my questions is about a topic only two documents mention, so
-     I expect that one to be hard." -->
+The city guides contain direct answers to my transport, cycling, and food
+questions, but they are spread across different towns and guides. A target of
+four allows one difficult retrieval while still requiring the system to find
+answer-bearing text for most questions.
 
 ---
 
@@ -33,8 +35,9 @@ contains the answer.
 Every answer the system produces names at least one source document.
 
 **Why this target:**
-<!-- Why all five and not four? What about your setup makes that achievable —
-     or what would have to go wrong for it not to be? -->
+Every chunk retains its source filename and the grounding instruction requires
+the model to name it. Since each answer is generated from retrieved chunks,
+every in-scope answer should be able to cite at least one source.
 
 ---
 
@@ -50,47 +53,40 @@ in at least 4 of 5 tries.
      just keep five of them, or the "4 of 5" above has nothing to be 4 of. -->
 
 **Why this target:**
-<!-- What did your distances look like when you set the cutoff in Milestone 4?
-     Was there a clean gap, or did the two groups overlap? -->
+My in-corpus distances ranged from 0.522 to 0.667, while the five unrelated
+questions ranged from 0.839 to 1.056. The 0.75 cutoff sits in that gap, so I
+expect all five unrelated questions to be refused; the 4-of-5 target leaves
+room for one borderline result in later runs.
 
 ---
 
 ## 4. Something about your chunks
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know if your chunks were the right size? Name something
-     countable or observable.
-
-     Examples of the right shape — don't copy these, they should come from
-     what you actually saw in Milestone 3:
-       - "At least 4 of 5 sampled chunks read as a complete thought, with no
-          sentence cut in half at either end."
-       - "No chunk is shorter than 200 characters, since anything below that
-          in my corpus turned out to be a heading with no content under it." -->
+At least 4 of 5 sampled chunks contain complete `##` guide sections and do not
+cut a section in the middle.
 
 
 
 **Why this target:**
-
+The city guides are structured by topic headings, so a complete section keeps
+the facts needed for a travel question together. The 1,120-character maximum
+is approximately 280 tokens, while allowing shorter chunks when a complete
+section is smaller.
 
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. It could be about
-     speed, about refusals, about a particular kind of question your corpus
-     handles badly, about source attribution being correct rather than merely
-     present — anything, as long as it names a number or an observable
-     outcome. -->
+For at least 4 of 5 travel questions about transport, routes, or local food,
+the answer includes the requested location, route, or practical detail.
 
 
 
 **Why this target:**
-
+These are the main questions a visitor would ask of this corpus. The guides
+state many of these details directly, but a small number require retrieval from
+one specific town guide rather than a regional overview.
 
 
 ---

@@ -42,6 +42,59 @@ class Chunk:
         return f"{self.source}#{self.index}"
 
 
+def header_split(
+    documents: list[Document],
+    chunk_size: int | None = None,
+    overlap: int | None = None,
+) -> list[Chunk]:
+    """
+    My special chunker. Since I'm focusing on the city-guides, and each paragraph is well structured and holds relevant data
+    for the particular topic/header. I want to split the paragraphs based on their headers (##) and then merge the paragrahs to 
+    hit the 
+
+    Keep this function. Milestone 3's stop rule points back at it, and having
+    something to compare your own strategy against is useful in unit 2.
+    """
+    chunk_size = chunk_size or config.CHUNK_SIZE
+    overlap = overlap or config.CHUNK_OVERLAP
+
+    if overlap >= chunk_size:
+        raise ValueError("overlap has to be smaller than chunk_size")
+
+    chunks: list[Chunk] = []
+    for doc in documents:
+        index = 0
+        sections = doc.text.split('##')
+        curr_sections = []
+        for section in sections:
+            candidate = "\n\n## ".join(curr_sections + [section])
+
+            if curr_sections and len(candidate) > chunk_size:
+                chunks.append(
+                    Chunk(
+                        text='\n\n## '.join(curr_sections),
+                        source=doc.source,
+                        index=index,
+                        produced_by="chunker.py::header_split",
+                    )
+                )
+                index += 1
+                curr_sections = [section]
+            else:
+                curr_sections.append(section)
+
+        if curr_sections:
+            chunks.append(
+                Chunk(
+                    text='\n\n## '.join(curr_sections),
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::header_split",
+                )
+            )
+
+    return chunks
+
 def fallback_split(
     documents: list[Document],
     chunk_size: int | None = None,
@@ -97,7 +150,7 @@ def split_documents(documents: list[Document]) -> list[Chunk]:
       - Would splitting on paragraph breaks keep more thoughts intact than
         splitting on a character count?
     """
-    return fallback_split(documents)
+    return header_split(documents)
 
 
 def describe(chunks: list[Chunk]) -> str:
