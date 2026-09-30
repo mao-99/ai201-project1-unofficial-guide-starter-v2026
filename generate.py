@@ -279,7 +279,9 @@ Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
 - If the documents don't cover the question, say you don't have enough information. Do not guess.
 - Name the document your answer came from, using the filename given in each excerpt.
-- Be brief. Two or three sentences is usually enough."""
+- Answer the question the user actually asked, even if the documents recommend something else. You can add that advice after the answer.
+- When the documents name several places, routes or options that answer the question (for example one per town), list every one of them rather than giving a general rule with a single example.
+- Otherwise be brief."""
 
 
 def build_prompt(question: str, results) -> str:

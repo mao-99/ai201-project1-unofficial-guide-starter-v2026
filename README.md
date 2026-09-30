@@ -378,34 +378,88 @@ different town.
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** One thing: the last rule of `GROUNDING_INSTRUCTION` in
+`generate.py`. Retrieval, chunking, top-k, the cutoff, the questions and the
+`expects` strings are all unchanged.
 
-**Why I picked it:**
+```diff
+- - Be brief. Two or three sentences is usually enough.
++ - Answer the question the user actually asked, even if the documents recommend something else. You can add that advice after the answer.
++ - When the documents name several places, routes or options that answer the question (for example one per town), list every one of them rather than giving a general rule with a single example.
++ - Otherwise be brief.
+```
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
+**Why I picked it:** The diagnosis put both criterion 5 failures at
+generation, with the right chunk already at rank 1. The "two or three
+sentences" rule was squeezing a four-town list down to a rule plus one example,
+so I replaced it with an instruction to list every option and to answer the
+question as asked. Hybrid search or re-chunking would have changed retrieval,
+and retrieval was already 6/6.
 
 ### Run Log — After
 
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
+`python run_eval.py --label after --corpus city_guides` →
+[`results/run_2026-09-29_2323_after.md`](results/run_2026-09-29_2323_after.md).
+Same six questions, three runs, caching off, same index.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 5 of 6 (was 4 of 5) | 6/6 | 6/6 | 6/6 | MET |
+| 2. Every answer names a source | 6 of 6 | 6/6 | 6/6 | 6/6 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Sampled chunks are whole `##` sections | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 5. Answer includes the requested detail | 5 of 6 (was 4 of 5) | 5/6 | 6/6 | 5/6 | MET |
 
-**Did it help?**
+Before and after, side by side, for the only criterion that moved:
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
+| Criterion 5, per question | Before (runs 1/2/3) | After (runs 1/2/3) |
+|---|---|---|
+| Coaches, airport, bike, fish and chips | pass pass pass | pass pass pass |
+| Locals — "where do they go to eat?" | **fail** pass pass | pass pass pass |
+| Tourist — "food with the scenery to match" | **fail fail fail** | **fail** pass\* **fail** |
+| **Total** | 4/6 · 5/6 · 5/6 | 5/6 · 6/6 · 5/6 |
 
-     Milestone 4. -->
+\* A false pass. See below.
+
+*Locals question, run 1, after* (`generate.py::answer_from_chunks`). Before,
+this run named only Corry Lane:
+
+```
+Based on the provided documents, good food at better value is generally found one street or level back from where the visitors go:
+
+* **Brightwater:** Corry Lane, which is two streets inland from the riverside strip, serves comparable food for about a third less (*guide_eating.md* and *guide_brightwater.md*).
+* **Corry Lane (Brightwater):** Guesthouses here offer better value than the obvious riverside hotels (*guide_brightwater.md*).
+* **Halden Bay:** Fell Street, one level up from the harbour front (*guide_eating.md*).
+* **Pellew Sands:** Marine Terrace, which is behind the seafront (*guide_eating.md*).
+* **Marchwood:** The good district is Northgate, which is a tram ride away, while the station area is uniformly poor (*guide_eating.md*). 
+```
+
+*Tourist question, run 3, after*. It fails in a new way: it now refuses:
+
+```
+I don't have enough information to answer your question about where to find food with the scenery to match. 
+
+*(Note: The provided documents do contain information about where to find good food in relation to visitor spots—such as Marine Terrace in Pellew Sands, Corry Lane in Brightwater, Fell Street in Halden Bay, and Northgate in Marchwood (guide_eating.md, guide_pellew_sands.md)—but they do not mention scenery matching these food locations.)*
+```
+
+**Did it help?** Partly. It fixed the problem the diagnosis was about. The
+locals question went from 2/3 to 3/3, and every answer that was cut down to
+one example now lists all the towns. That moved criterion 5 from MISSED to
+MET. It did **not** fix the tourist question. That one went from "answers a
+different question" to "says it doesn't have enough information" (runs 1 and
+3). The new "answer the question actually asked" rule seems to have made
+the model more literal: the chunk never uses the word "scenery", so the
+model now decides it can't answer. The run 2 "pass" is a false positive from
+the scorer. The answer mentions "Brightwater's riverside strip" only as the
+expensive place to avoid, which is the same failure as before. Re-scored by
+reading it, criterion 5 is 5/6 on all three runs. That still holds the
+5-of-6 target, so the verdict stays MET, but only just.
+
+It also had side effects. Answers are 3–4× longer (the bike answer went
+from one sentence to two bullet lists), and two locals answers now include
+padding: a "Corry Lane" bullet listed as if it were a town, and a line about
+guesthouses, which isn't food. Criterion 2 held at 6/6, so the longer answers
+didn't lose their citations.
 
 ## What's Still Broken
 
