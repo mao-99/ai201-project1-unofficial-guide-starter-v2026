@@ -314,23 +314,67 @@ false was added. The 5/6 runs are, if anything, generous.
 
 ## Diagnoses
 
-<!-- For each miss: which stage caused it, and how. The stage alone isn't
-     enough — you need the mechanism.
+One criterion missed: **5**. It comes from two questions: the tourist
+question (fails 3/3) and the locals question (fails 1/3).
 
-     Not a diagnosis: "Question 3 didn't work."
-     A diagnosis:     "Question 3 asks about laundry costs. The answer is in
-                       one sentence that got split across two chunks, so
-                       neither chunk on its own contains it."
+**The backwards check first.** For both questions, the chunk that holds the
+full answer, `guide_eating.md#0`, is retrieved at **rank 1** (0.576 and
+0.522), and criterion 1 is 6/6. The answer was sitting in the prompt every
+time. So the failure is after retrieval: **the generation stage.**
 
-     The five stages: loading → chunking → embedding → retrieval → generation.
+`guide_eating.md#0` says:
 
-     Look for a pattern. If three misses all ask about numbers, that's one
-     problem, not three.
+```
+Almost everywhere in this region, the good cooking is one street back from
+wherever the visitors are. Brightwater's riverside strip is priced for people
+who walked there from the hotels; Corry Lane, two streets inland, serves
+comparable food for about a third less. Halden Bay's harbour front is roughly
+double Fell Street, one level up. Pellew Sands's seafront is chips and ice
+cream, and Marine Terrace behind it is where the actual restaurants are.
+```
 
-     Missed nothing? Say so, then say honestly whether your targets were set
-     low, and which one you'd tighten and to what.
+**Locals question: generation, compression to one example.** The chunk
+lists four "go here instead" streets, one per town. The grounding instruction
+in `generate.py` ends with *"Be brief. Two or three sentences is usually
+enough."* On run 1 the model met that by stating the general rule ("one
+street back") and giving a single `e.g.` (Corry Lane). Marine Terrace was
+dropped. On runs 2 and 3 it happened to give two examples and passed. The
+list was in the prompt; the brevity rule let the model cut it down to one
+item, and whether it cut to one or two varied from run to run.
 
-     Milestone 3. -->
+**Tourist question: generation, answering the chunk's thesis instead of
+the question.** The question asks where the tourist-facing food *is*, with a
+view. The retrieved chunk is framed as advice *against* those places (the
+riverside is "priced for people who walked there from the hotels"). All three
+answers repeat the chunk's argument, "the good cooking is one street back",
+and send the user away from the scenic front. None names the riverside, the
+seafront, or the harbour front as the answer. The model took the chunk's main
+point as the answer and never answered the question actually asked. Brevity
+makes this worse: with two or three sentences, the model only has room for
+the chunk's headline point.
+
+**The pattern.** These are the only two questions whose answer is a
+**list across towns inside one regional chunk** (`guide_eating.md`). Every
+single-fact question (coaches, airport, fish and chips) and the bike question
+pass 3/3. So it's one problem, not two: when the answer is a list, the
+generation step turns it into a general rule plus at most one or two
+examples, because the prompt asks for two or three sentences and doesn't ask
+it to list every place the documents name.
+
+**Ruled out:**
+- *Chunking*: `guide_eating.md#0` holds the whole "pattern worth knowing"
+  section in one piece. Nothing was split.
+- *Embedding / retrieval*: the right chunk is the closest match for both
+  questions.
+- *Loading*: the text in the index matches the source file.
+
+**A near-miss that didn't fail but is worth noting.** For the airport
+question, the answer chunk is third, behind Corry Vale (no airport content) and
+Marchwood ("the airport is 20 minutes out"). All three answers hedge with
+both. It passes because the scorer only checks for "90 minutes by road", but
+a user asking "the closest airport" would get two numbers with no way to
+choose between them. That's retrieval pulling in a same-topic chunk about a
+different town.
 
 ## The Improvement
 
