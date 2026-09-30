@@ -28,6 +28,17 @@ questions, but they are spread across different towns and guides. A target of
 four allows one difficult retrieval while still requiring the system to find
 answer-bearing text for most questions.
 
+> **Revised in unit 2:** For at least 5 of my 6 test questions, one retrieved
+> chunk contains every phrase in that question's `expects` string.
+>
+> **Why revised:** Two measurement problems, not a missed number. First, the
+> `questions.py` I committed in unit 1 has **six** questions (the airport
+> question from my Sample Answer is the sixth), so "4 of my 5" had nothing to
+> be 4 of. I kept the same bar — 80% — which is 5 of 6; 4 of 6 would have
+> quietly lowered it. Second, "contains the answer" was a judgment call. Tying
+> it to the `expects` phrases I wrote before any results existed makes it
+> something `scorer.py::retrieved_has_answer` checks the same way every time.
+
 ---
 
 ## 2. Every answer names a source
@@ -38,6 +49,16 @@ Every answer the system produces names at least one source document.
 Every chunk retains its source filename and the grounding instruction requires
 the model to name it. Since each answer is generated from retrieved chunks,
 every in-scope answer should be able to cite at least one source.
+
+> **Revised in unit 2:** Every answer names at least one source document by
+> its filename (e.g. `guide_brightwater.md`) — 6 of 6 on every run.
+>
+> **Why revised:** "Names a source" didn't say what counts. "According to the
+> Brightwater guide" and "(guide_brightwater.md)" are both arguably a source,
+> and I'd have scored them differently on different days. The grounding
+> instruction asks for the filename, so the filename is what I check
+> (`scorer.py::names_source`). The count is 6, not 5, because `questions.py`
+> has six questions.
 
 ---
 
@@ -87,6 +108,14 @@ the answer includes the requested location, route, or practical detail.
 These are the main questions a visitor would ask of this corpus. The guides
 state many of these details directly, but a small number require retrieval from
 one specific town guide rather than a regional overview.
+
+> **Revised in unit 2:** For at least 5 of my 6 test questions, the answer
+> contains every phrase in that question's `expects` string.
+>
+> **Why revised:** Same two problems as criterion 1. There are six questions,
+> so 80% is 5 of 6. And "includes the requested detail" needed a fixed
+> definition: the `expects` strings I committed in unit 1, before any
+> results, checked by `scorer.py::judge`.
 
 
 ---

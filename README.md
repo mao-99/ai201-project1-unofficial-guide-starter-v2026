@@ -282,22 +282,35 @@ Based on the provided documents, the good cooking is typically found one street 
 
 ## Verdicts
 
-<!-- MET or MISSED for each of the five, against the target you wrote last
-     unit — not a new one. Plus a sentence on how you decided. That sentence
-     matters most where it was close.
-
-     If your target said 4 of 5 and your runs came out 4, 3, 4, that's a MISS.
-     The target has to hold, not show up occasionally.
-
-     Milestone 2. -->
+Targets are the unit 1 targets. Three of them (1, 2, 5) are revised in
+`criteria.md` for *measurement* reasons only: `questions.py` had six
+questions, not five, so "4 of 5" became "5 of 6" (the same 80% bar, not a
+lower one), and "contains the answer" / "names a source" were pinned to
+checks I can repeat. The originals are still there, above the revisions.
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+| 1 | Retrieved chunk contains the answer | **MET** | 6/6 on all three runs against a target of 5 of 6. Not close, but it's weaker than it looks: for the airport question the answer chunk is only third of five, behind two chunks with no answer in them. |
+| 2 | Every answer names a source | **MET** | 18 of 18 answers include a `.md` filename. The target was "every answer", so one miss would have been a MISS; there wasn't one. |
+| 3 | Gate stops out-of-corpus questions | **MET** | 5/5 refused against a target of 4 of 5. The closest one (ibuprofen, 0.839) still clears the 0.75 cutoff by 0.089. It's one deterministic measurement, repeated across the columns. |
+| 4 | Sampled chunks are whole `##` sections | **MET** | 5/5 sampled chunks are made only of complete sections. Honestly, this holds by construction: `header_split` only ever cuts at `##`, so this target couldn't be missed (see *What I'd Do Differently*). |
+| 5 | Answer includes the requested detail | **MISSED** | 4/6, 5/6, 5/6 against a target of 5 of 6. It held on two runs and broke on one, and the target has to hold every time, so this is a MISS. It is also the closest call in the table. The tourist question failed all three runs, so one bad run on any other question drops the count below target. |
+
+**Arguing the opposite verdict on 5.** The strongest case for MET is that the
+tourist question's `expects` is too narrow: Pellew Sands' seafront and Halden
+Bay's harbour front are also "food with scenery", so an answer naming those
+could fairly count. I checked: no run names *any* tourist-facing place as the
+recommendation. All three steer the tourist *away* from the scenic front to
+the cheaper street behind it. So even a generous scorer fails it, and the
+verdict stays MISSED. I'm also not changing that `expects` string now,
+because it would be moving the target after seeing the result.
+
+**Where the scorer is too generous.** Run 3 of the locals question passes
+criterion 5 but says "two levels up from Halden Bay's harbour front". The
+guide says *one* level. Run 1 of the tourist question (a fail anyway) puts
+"Marine Terrace in Halden Bay", but Marine Terrace is in Pellew Sands. So
+`scorer.py` checks that the expected phrases are present, not that nothing
+false was added. The 5/6 runs are, if anything, generous.
 
 ## Diagnoses
 
