@@ -51,6 +51,34 @@ def load_scorer():
     return judge if callable(judge) else None
 
 
+def check_chunks(corpus, sample=5, seed=201):
+    """Criterion 4: are sampled chunks made of whole `##` sections?
+
+    A chunk passes when every `##` piece of it is, word for word, a complete
+    section of its source document — nothing cut off at either end. The sample
+    is seeded so every run checks the same five chunks.
+    """
+    import random
+    from ingest import load_documents
+    from chunker import split_documents
+
+    documents = load_documents(corpus)
+    sections = {
+        d.source: {s.strip() for s in d.text.split("##") if s.strip()} for d in documents
+    }
+    chunks = split_documents(documents)
+    picked = random.Random(seed).sample(chunks, min(sample, len(chunks)))
+
+    rows = []
+    for chunk in picked:
+        pieces = [s.strip() for s in chunk.text.split("##") if s.strip()]
+        whole = all(piece in sections[chunk.source] for piece in pieces)
+        rows.append({"label": chunk.label, "sections": len(pieces),
+                     "chars": len(chunk.text), "whole": whole,
+                     "produced_by": chunk.produced_by})
+    return rows
+
+
 def run_once(question: str, top_k, threshold, corpus, variant):
     """One question, one run. Returns the answer and what retrieval gave us."""
     from store import search
@@ -115,6 +143,10 @@ def main():
             passed = judge(question, expects, answer, results) if judge else None
             run_results.append(passed)
 
+            import scorer
+            has_answer = scorer.retrieved_has_answer(expects, results)
+            cites = scorer.names_source(answer)
+
             mark = {True: "pass", False: "fail", None: "—"}[passed]
             print(f"  run {run}: {mark}  (best distance {decision.best_distance:.3f})")
 
@@ -126,16 +158,21 @@ def main():
                     "sources": sorted({r.source for r in results}),
                     "best_distance": decision.best_distance,
                     "gate_passed": decision.passed,
+                    "retrieved_has_answer": has_answer,
+                    "names_source": cites,
+                    "answer_correct": passed,
+                    "chunks": [f"{r.label} ({r.distance:.3f})" for r in results],
                 }
             )
 
         rows.append({"question": question, "expects": expects, "runs": run_results})
 
     gate_rows = check_out_of_scope(top_k, threshold, corpus, args.variant)
+    chunk_rows = check_chunks(corpus)
 
     write_report(
         rows, transcript, gate_rows, args, corpus, top_k, threshold,
-        scored=judge is not None,
+        scored=judge is not None, chunk_rows=chunk_rows,
     )
 
 
@@ -176,7 +213,28 @@ def check_out_of_scope(top_k, threshold, corpus, variant):
     return rows
 
 
-def write_report(rows, transcript, gate_rows, args, corpus, top_k, threshold, scored):
+def criterion_summary(transcript, gate_rows, chunk_rows, runs):
+    """One row per criterion, one column per run — the shape the README wants."""
+    def per_run(key):
+        cells = []
+        for run in range(1, runs + 1):
+            entries = [e for e in transcript if e["run"] == run]
+            cells.append(f"{sum(bool(e[key]) for e in entries)}/{len(entries)}")
+        return cells
+
+    refused = f"{sum(r['refused'] for r in gate_rows)}/{len(gate_rows)}"
+    whole = f"{sum(r['whole'] for r in chunk_rows)}/{len(chunk_rows)}"
+    return [
+        ("1. Retrieved chunk contains the answer", per_run("retrieved_has_answer")),
+        ("2. Every answer names a source", per_run("names_source")),
+        ("3. Gate stops out-of-corpus questions", [refused] * runs),
+        ("4. Sampled chunks are whole `##` sections", [whole] * runs),
+        ("5. Answer includes the requested detail", per_run("answer_correct")),
+    ]
+
+
+def write_report(rows, transcript, gate_rows, args, corpus, top_k, threshold, scored,
+                 chunk_rows=()):
     config.RESULTS_DIR.mkdir(exist_ok=True)
     stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M")
     label = f"_{args.label}" if args.label else ""
@@ -219,6 +277,35 @@ def write_report(rows, transcript, gate_rows, args, corpus, top_k, threshold, sc
             "> the scorer first and re-run.",
         ]
 
+    lines += [
+        "",
+        "## Per criterion",
+        "",
+        "Criteria 1, 2 and 5 are scored by `scorer.py` on every run. Criteria 3",
+        "and 4 are deterministic (retrieval, the gate, and the chunker have no",
+        "randomness), so their single measurement is repeated in each column.",
+        "",
+        f"| Criterion | {run_headers} |",
+        f"|---|{run_divider}|",
+    ]
+    for name, cells in criterion_summary(transcript, gate_rows, chunk_rows, n):
+        lines.append(f"| {name} | {' | '.join(cells)} |")
+
+    if chunk_rows:
+        lines += [
+            "",
+            "### Criterion 4 — sampled chunks",
+            "",
+            f"Produced by `run_eval.py::check_chunks` over chunks from "
+            f"`{chunk_rows[0]['produced_by']}`, seed 201.",
+            "",
+            "| Chunk | `##` sections | Characters | Whole sections only? |",
+            "|---|---|---|---|",
+        ]
+        for row in chunk_rows:
+            lines.append(f"| {row['label']} | {row['sections']} | {row['chars']} | "
+                         f"{'yes' if row['whole'] else '**no**'} |")
+
     if gate_rows:
         refused = sum(r["refused"] for r in gate_rows)
         lines += [
@@ -254,6 +341,10 @@ def write_report(rows, transcript, gate_rows, args, corpus, top_k, threshold, sc
             f"- Best distance: {entry['best_distance']:.4f} "
             f"({'passed' if entry['gate_passed'] else 'refused by'} the gate)",
             f"- Sources retrieved: {', '.join(entry['sources']) or 'none'}",
+            f"- Chunks retrieved: {', '.join(entry['chunks']) or 'none'}",
+            f"- Criterion 1 (a chunk holds the answer): {entry['retrieved_has_answer']} · "
+            f"criterion 2 (names a source): {entry['names_source']} · "
+            f"criterion 5 (answer has the detail): {entry['answer_correct']}",
             "",
             "```",
             entry["answer"],

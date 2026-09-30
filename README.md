@@ -186,27 +186,99 @@ to `0.75` because that value fell in the observed gap.
 
 ## Run Log — Before
 
-<!-- Your five criteria, three runs each. `python run_eval.py --label before`
-     runs the questions, puts the OUT_OF_SCOPE ones through the gate, and
-     writes it all into results/ for you. Targets come from criteria.md; the
-     verdict column is your call.
+Produced by `python run_eval.py --label before --corpus city_guides` →
+[`results/run_2026-09-29_2319_before.md`](results/run_2026-09-29_2319_before.md).
+Six questions (the five from unit 1 plus the airport question from my Sample
+Answer — see the criterion revisions in `criteria.md`), three runs each,
+caching off, top-k 5, cutoff 0.75, chunks from `chunker.py::header_split`.
 
-     Criterion 3 is measured in one deterministic pass rather than three, so
-     the same number goes in all three run columns. That's correct, not lazy.
-
-     Milestone 1. -->
+Criteria 1, 2 and 5 are scored by `scorer.py` on every run. Criteria 3 and 4
+are deterministic — retrieval, the gate, and the chunker have no randomness —
+so one measurement goes in all three columns.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 5 of 6 (was 4 of 5) | 6/6 | 6/6 | 6/6 | MET |
+| 2. Every answer names a source | 6 of 6 | 6/6 | 6/6 | 6/6 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Sampled chunks are whole `##` sections | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 5. Answer includes the requested detail | 5 of 6 (was 4 of 5) | 4/6 | 5/6 | 5/6 | MISSED |
 
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
+### Real output, per criterion
+
+**Criterion 1** — retrieval for *"How far is the closest airport?"*, run 1.
+Produced by `store.py::search`, checked by `scorer.py::retrieved_has_answer`.
+The answer sentence is in `guide_brightwater.md#0`, third of five:
+
+```
+- Best distance: 0.6673 (passed the gate)
+- Chunks retrieved: guide_corry_vale.md#0 (0.667), guide_marchwood.md#0 (0.700), guide_brightwater.md#0 (0.725), guide_regional_transport.md#1 (0.757), guide_walking.md#1 (0.769)
+- Criterion 1 (a chunk holds the answer): True
+
+guide_brightwater.md#0 contains:
+"Long-distance coaches stop on Verrill Street rather than at the station, which
+catches people out. There is no airport; the nearest is 90 minutes by road."
+```
+
+**Criterion 2** — *"Where should I ride my bike along? Where shouldn't I?"*,
+run 3. Produced by `generate.py::answer_from_chunks`, checked by
+`scorer.py::names_source`:
+
+```
+Based on the documents, cycling is pleasant on the **Brightwater river path** and the **old railway trackbed from Kestrelford**, but it is unpleasant on **Mill Road** and the **coast road** (neither of which has a shoulder). 
+
+Source: `guide_regional_transport.md`
+```
+
+**Criterion 3** — produced by `run_eval.py::check_out_of_scope`, cutoff 0.75:
+
+```
+Out-of-scope questions (the gate should refuse these):
+  refused  (best distance 0.863)  What is the capital of Mongolia?
+  refused  (best distance 0.899)  How do I change the oil in a diesel engine?
+  refused  (best distance 1.056)  Who won the 1994 World Cup?
+  refused  (best distance 0.839)  What is the recommended dosage of ibuprofen for a headache?
+  refused  (best distance 0.883)  How do I write a for loop in Rust?
+  -> gate refused 5 of 5
+```
+
+**Criterion 4** — produced by `run_eval.py::check_chunks` over chunks from
+`chunker.py::header_split` (five chunks, seed 201). A chunk passes when every
+`##` piece of it is, word for word, a whole section of its source file. As a
+check on the checker, the same function scores `fallback_split` 0/5.
+
+```
+| Chunk | `##` sections | Characters | Whole sections only? |
+|---|---|---|---|
+| guide_brightwater.md#1 | 3 | 960 | yes |
+| guide_marchwood.md#1 | 3 | 870 | yes |
+| guide_regional_transport.md#1 | 2 | 914 | yes |
+| guide_accessibility.md#0 | 2 | 892 | yes |
+| guide_kestrelford.md#1 | 4 | 1120 | yes |
+```
+
+**Criterion 5** — produced by `generate.py::answer_from_chunks`, scored by
+`scorer.py::judge`. A pass, then the two failures.
+
+*"Where do long distance coaches stop?"* — run 1, expects `Verrill Street`, **pass**:
+
+```
+Long-distance coaches stop on Verrill Street (guide_brightwater.md).
+```
+
+*"I havent met any locals yet - where do they go to eat? Good food and great
+value"* — run 1, expects `Marine Terrace, Corry Lane`, **fail**:
+
+```
+Across the region, locals go one street back from where the visitors are, as good cooking is typically found there for about a third less than the tourist spots (e.g., Corry Lane in Brightwater). (Source: guide_eating.md and guide_brightwater.md)
+```
+
+*"I'm a tourist, where do I find the food for me - with the scenery to match?"*
+— run 2, expects `Brightwater's riverside`, **fail (all three runs)**:
+
+```
+Based on the provided documents, the good cooking is typically found one street back from the visitors and scenery. For example, in Pellew Sands, the seafront offers chips and ice cream, while the better cooking is on Marine Terrace one street back (`guide_pellew_sands.md`, `guide_eating.md`). Similarly, in Halden Bay, the harbour front prices are higher, and better food can be found on Fell Street, one level up (`guide_eating.md`).
+```
 
 ## Verdicts
 
