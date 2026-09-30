@@ -171,6 +171,23 @@ explained that this project reports distance, where lower is better. I compared
 my in-corpus and out-of-corpus distances, then changed the cutoff from `0.6`
 to `0.75` because that value fell in the observed gap.
 
+**3. (Unit 2)** I used Claude Code to build `scorer.py` and to extend
+`run_eval.py` so the results file reports one row per criterion, including a
+criterion-4 chunk check (`run_eval.py::check_chunks`). I had it prove the
+chunk check can fail by running it against `fallback_split` (0/5). It also
+found two setup problems: my `.env` still pointed at `campus_life`, and the
+rate limiter allowed 30 requests a minute against a free-tier cap of 15.
+
+**4. (Unit 2)** I had Claude read all 18 baseline answers alongside the
+retrieved chunks and look for a pattern in the failures. It pointed out that
+the only two failing questions both draw on one list inside
+`guide_eating.md#0`, and that the "two or three sentences" rule was the
+likely cause. I checked this myself: the chunk is rank 1 for both
+questions, so the problem is generation. I also had it argue the opposite
+verdict on criterion 5 (see *Verdicts*). Reading the after answers by hand
+is how I caught the scorer's false pass on the tourist question. The scorer
+alone reported it as fixed.
+
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
      claims earns nothing.
@@ -463,17 +480,71 @@ didn't lose their citations.
 
 ## What's Still Broken
 
-<!-- For each criterion still missed after your fix: what you'd do about it,
-     and why you stopped where you did.
+Every criterion is MET after the fix, but these things are still wrong:
 
-     "I ran out of time" is fine if it's true. Pretending nothing is left is
-     not.
+**1. The tourist question fails 3 of 3 when read by hand** (criterion 5
+passes on the other five questions only). The mechanism has moved but not
+gone away: generation either repeats the chunk's "go one street back"
+argument or now refuses because the documents never say "scenery". *What
+I'd do:* add a rule that the "don't have enough information" line is only
+for questions the documents don't cover at all, not ones they cover with
+different wording. Then check the refusal rate on the other five questions,
+because loosening that rule is how made-up answers get in. *Why I
+stopped:* that's a second prompt change. Making it on top of the first would
+mean I couldn't tell which change did what. It needs its own before/after
+run. The question itself is also ambiguous ("food for me", "scenery to
+match"), and I'd rewrite it for the next unit rather than tune the prompt
+for one badly worded question.
 
-     Milestone 5. -->
+**2. `scorer.py` passes answers that shouldn't pass.** It gave a pass to an
+answer that names the riverside only as the place to avoid, and to a before
+answer that says "two levels up" when the guide says one. *What I'd do:*
+check that each expected phrase appears near the thing being recommended,
+and add a list of known-wrong facts per question (e.g. "Marine Terrace" +
+"Halden Bay") that fails an answer outright. *Why I stopped:* the scorer
+is good enough to show the direction of the change, and I re-scored the
+one false pass by hand in this README. Making it more precise is its own
+piece of work.
+
+**3. The airport answer hedges between two numbers.** Every run gives both
+Brightwater's 90 minutes and Marchwood's 20 minutes. It passes because
+"90 minutes by road" is present, but a user can't act on it. This is
+retrieval pulling in a same-topic chunk from another town (Marchwood's is
+second, Brightwater's third). *What I'd do:* nothing at the system level
+yet. The question doesn't say "from Brightwater", so the hedge is arguably
+correct. I'd make the question specific instead.
+
+**4. Answers got longer and padded.** The "list every one" rule over-applies:
+bike answers became two bullet lists, and the locals answer lists
+guesthouses. *What I'd do:* limit the rule to questions asking *where*.
+*Why I stopped:* no criterion measures length, so I can't tell whether a
+change here helps or hurts. That's a gap in my criteria, which is the next
+section.
 
 ## What I'd Do Differently
 
-<!-- Knowing what you know now — which of your five criteria would you write
-     differently, and why?
+**Criterion 4 (whole `##` sections) is the one I'd rewrite.** It couldn't
+fail: `header_split` only ever cuts at `##`, so "doesn't cut a section in
+the middle" is true by construction, and 5/5 tells me nothing. I'd replace it
+with something the chunker could actually get wrong, e.g. *"For each test
+question, the full answer is inside a single chunk rather than split across
+two, for at least 5 of 6"*. Or I'd target the boilerplate "Practical notes"
+section that appears word for word in several town guides and crowds
+retrieval.
 
-     Milestone 5. -->
+**Criterion 5** needs to say what a correct answer *doesn't* contain, not just
+what it does. Both scorer holes above are answers that contain the right
+words next to a wrong claim. It should also cover the question as asked
+("recommends a tourist-facing place"), not a single phrase, and I'd add a
+length or "no padding" criterion so a fix like mine can't quietly make
+answers worse.
+
+**Criteria 1 and 2** I'd write with the right question count from the start
+and with the check spelled out ("contains every `expects` phrase", "names a
+`.md` file"). I revised both this unit for exactly that reason.
+
+**Criterion 3** is fine but safe: the closest out-of-scope question is 0.089
+over the cutoff. Next time I'd use at least two *near-miss* out-of-scope
+questions (say, "What time does Brightwater's cinema open?", which is in the
+right region but on a topic the guides don't cover) instead of five that are
+obviously unrelated.
